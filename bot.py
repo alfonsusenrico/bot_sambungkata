@@ -12,30 +12,31 @@ auth = AutentikasiKBBI("")
 
 @bot.event
 async def on_ready():
-    print("bot siap mengontol")
+    print("bot siap")
+
+# @bot.command()
+# async def tes(message):
+#     await message.send(f'{message.author.mention}\'s id: `{message.author.id}`') 
 
 @bot.command()
-async def tes(message):
-    await message.send(f'{message.author.mention}\'s id: `{message.author.id}`') 
-
-@bot.command()
-async def plei(message):
+async def plei(message, highscore = 100, jumlah_roll = 5):
     host = message.author.mention
     await message.send(host+ ' memulai permainan, ketik `melok` untuk ikutan')
     teks = 'Players:\n'
     teksobj = await message.send(teks)
 #   print(message.message.id)
-    await main(message, host, teks, teksobj)
+    await main(message, host, teks, teksobj,highscore,jumlah_roll)
 
 @bot.command()
-async def ajak(message):
-    await message.send('@everyone mari mengontol kita main gim sambung words')
+async def ajak(message, friend= '@everyone'):
+    await message.send(friend+' mari mengontol kita main gim sambung words')
 
-async def main(message,host,teks,teksobj):
-    score = 100
+async def main(message,host,teks,teksobj,highscore,jumlah_roll):
+    score = highscore
+    kataterpakai = []
     players = []
     roll = False
-    before = ''
+
     player = Player(message.author.id, message.author.name)
     players.append(player)
     newteks = await addPlayer(teks,players)
@@ -59,15 +60,21 @@ async def main(message,host,teks,teksobj):
         if msg.author.mention == host:
             if msg.content == 'start':
                 if len(players) >= 2:
+                    for player in players:
+                        player.roll = jumlah_roll
                     break
                 else:
                     await message.send('Permainan membutuhkan minimal 2 orang')
-            # elif msg.content == 'bot':
-            #     split = str(bot.user).split('#')[0]
-            #     player = Player(bot.user.id,split)
-            #     players.append(player)
-            #     newteks = await addPlayer(teks,players)
-            #     await teksobj.edit(content=newteks)
+            
+            elif msg.content == 'exit':
+                await message.send('Game exit')
+                exit
+            elif msg.content == 'bot':
+                split = str(bot.user).split('#')[0]
+                player = Player(bot.user.id,split)
+                players.append(player)
+                newteks = await addPlayer(teks,players)
+                await teksobj.edit(content=newteks)
     
     random.shuffle(players)
 
@@ -77,21 +84,36 @@ async def main(message,host,teks,teksobj):
     await teks_score_obj.edit(content=teks_score)
     
     input = await getRandomWord()
+    kataterpakai.append(input)
     wait = await message.send(input)
+    #before = input
 
-    kata = KBBI(wait.content, auth)
+    while True:
+        try:
+            kata = KBBI(wait.content, auth)
+            break
+        except:
+            input = await getRandomWord()
+            kataterpakai.append(input)
+            wait = await message.send(input)
+            #before = input
+            kata = KBBI(wait.content, auth)
+
     katajson = kata.serialisasi()
     entri = katajson['entri'][0]['nama']
-    await message.send('**'+entri+' - '+str(len(entri)-1)+'**')
-    await message.send(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False))
+    tekskirim = "**"+entri+" - "+str(len(entri)-1)+"**\n"
+    tekskirim += str(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False)+'\n')
+    #await message.send('**'+entri+' - '+str(len(entri)-1)+'**')
+    #await message.send(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False))
 
     if "." in entri:
         split = entri.split('.')
         next = split[len(split)-1]
     else:
-        split = await makeSplit(entri.lower())
+        next = await makeSplit(entri.lower())
 
-    await message.send('Lanjutkan kata dengan awalan **'+next+'**')
+    tekskirim += "Lanjutkan kata dengan awalan **"+next+"**"
+    await message.send(tekskirim)
 
     while True:
         wait = await bot.wait_for('message')
@@ -106,48 +128,87 @@ async def main(message,host,teks,teksobj):
                 else:
                     await message.send('Entek roll mu')
                     
-            if wait.content == 'nyerah':
-                wait = await message.send(players[0].name+' nyerah anjing gublug')
-                wait = await message.send(before)
-                players.pop(0)
+            elif wait.content == 'nyerah':
+                if wait.author.name == 'Renton':
+                    wait = await message.send('YATIM KOK NYERAH AKWOAKWOAKWOAWKOK')
+                else:
+                    wait = await message.send(players[0].name+' nyerah anjing gublug')
+                if type(players) == list:
+                    players.pop(0)
+                else:
+                    players.popleft()
+                if len(players) > 1:
+                    continue
+                else:
+                    await message.send('Game selesai! '+players[0].name+' menang dengan point '+str(players[0].score))
+                    break
+
+            elif wait.content == 'exit':
+                await message.send('Game exit')
+                break
         else:
             check = False
 
         if check == True:
             try:
-                input = wait.content
-                before = input
-                kata = KBBI(input, auth)
-                
-                if roll == False:
-                    players[0].addPoint(len(wait.content))
-                    if players[0].score >= score:
-                        await message.send('Game selesai! '+players[0].name+' menang dengan point '+str(players[0].score))
-                        break
-                    players = deque(players)
-                    players.rotate(1)
+                if wait.content in kataterpakai:
+                    await message.send('Kata sudah digunakan')
                 else:
-                    players[0].useRoll()
-                    roll = False
+                    input = wait.content
+                    #before = input
+                    kata = KBBI(input, auth)
+                    kataterpakai.append(input)
+                    if roll == False:
+                        players[0].addPoint(len(wait.content))
+                        if players[0].score >= score:
+                            await message.send('Game selesai! '+players[0].name+' menang dengan point '+str(players[0].score))
+                            if type(players) == list:
+                                players.pop(0)
+                            else:
+                                players.popleft()
+                            kalah = ''
+                            for player in players:
+                                kalah += '@'+player.name+' , '
+                            kalah += 'GOBLOG AWKOAKWOAKWOAKWOAKW'
+                            await message.send(kalah)
+                            break
+                        players = deque(players)
+                        players.rotate(1)
+                    else:
+                        players[0].useRoll()
+                        roll = False
 
-                teks_score = 'Scoreboard:\n'
-                teks_score_obj = await message.send(teks_score)
-                teks_score = await scoreBoard(teks_score,players)
-                await teks_score_obj.edit(content=teks_score)
+                    teks_score = 'Scoreboard:\n'
+                    teks_score_obj = await message.send(teks_score)
+                    teks_score = await scoreBoard(teks_score,players)
+                    await teks_score_obj.edit(content=teks_score)
 
-                katajson = kata.serialisasi()
-                entri = katajson['entri'][0]['nama']
-                await message.send('**'+entri+'**')
-                await message.send(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False))
-                # print(entri)
-                # print(kata.__str__(contoh=False))
-                #print(kata.serialisasi())
-                if "." in entri:
-                    split = entri.split('.')
-                    next = split[len(split)-1]
-                else:
-                    next = await makeSplit(entri.lower())
-                await message.send('Lanjutkan kata dengan awalan **'+next+'**')
+                    katajson = kata.serialisasi()
+                    entri = katajson['entri'][0]['nama']
+                    # await message.send('**'+entri+'**')
+                    # await message.send(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False))
+                    # # print(entri)
+                    # # print(kata.__str__(contoh=False))
+                    # #print(kata.serialisasi())
+                    # if "." in entri:
+                    #     split = entri.split('.')
+                    #     next = split[len(split)-1]
+                    # else:
+                    #     next = await makeSplit(entri.lower())
+                    # await message.send('Lanjutkan kata dengan awalan **'+next+'**')
+
+                    tekskirim = "**"+entri+" - "+str(len(entri)-1)+"**\n"
+                    tekskirim += str(kata.__str__(contoh=False,terkait=False,fitur_pengguna=False)+'\n')
+                    
+                    if "." in entri:
+                        split = entri.split('.')
+                        next = split[len(split)-1]
+                    else:
+                        next = await makeSplit(entri.lower())
+
+                    tekskirim += "Lanjutkan kata dengan awalan **"+next+"**"
+                    await message.send(tekskirim)
+
             except TidakDitemukan as e:
                 print(e)
                 await message.send("Ngarang blok")
@@ -156,8 +217,8 @@ async def addPlayer(teks,players):
     newteks = teks
     co = 1
     for player in players:
-        if co == 1:
-            newteks += str(str(co) +'. '+player.name+'\n')
+        newteks += str(str(co) +'. '+player.name+'\n')
+        co += 1
     return newteks
 
 async def scoreBoard(teks_score,players):
