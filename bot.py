@@ -10,15 +10,16 @@ from kbbi import TidakDitemukan
 bot = commands.Bot(command_prefix='b!')
 bot.remove_command("help")
 try:
-    auth = AutentikasiKBBI("")
+    auth = AutentikasiKBBI("EMAIL","PASS")
 except:
-    auth = AutentikasiKBBI("")
+    auth = AutentikasiKBBI("EMAIL","PASS")
 file = open("words.txt", "r")
 words = file.readlines()
 file.close()
 
 @bot.event
 async def on_ready():
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="bokep"))
     print("bot siap")
 
 @bot.command()
@@ -84,26 +85,31 @@ async def main(message,host,teks,teksobj,highscore,jumlah_roll):
             elif msg.content == 'bot':
                 split = str(bot.user).split('#')[0]
                 player = Player(bot.user.id,split)
-                players.append(player)
+                id = bot.user.id
+                exist = False
+                for player in players:
+                    if player.id == id:
+                        exist = True
+                        break
+                if exist == False:
+                    player = Player(id,split)
+                    players.append(player)
+
                 newteks = await addPlayer(teks,players)
                 await teksobj.edit(content=newteks)
     
     random.shuffle(players)
     
     input = getRandomWord()
-    wait = await message.send(input)
 
     while True:
         try:
-            kata = KBBI(wait.content, auth)
+            kata = KBBI(input, auth)
             kataterpakai.append(input)
             break
         except:
             input = getRandomWord()
-            kataterpakai.append(input)
-            wait = await message.send(input)
-            break
-            # kata = KBBI(wait.content, auth)
+            # wait = await message.send(input)
 
     katajson = kata.serialisasi()
     entri = katajson['entri'][0]['nama']
@@ -164,9 +170,11 @@ async def main(message,host,teks,teksobj,highscore,jumlah_roll):
                             print('exception check: '+str(e))
                 bot_words.clear()
         else:
+            print('menunggu input')
             wait = await bot.wait_for('message')
-
+        print('input: '+wait.content)
         if wait.author.id == players[0].id:
+            print('masuk sini')
             check = await checkWord(next,wait.content,roll)
             if wait.content == 'roll':
                 if players[0].roll > 0:
@@ -186,7 +194,8 @@ async def main(message,host,teks,teksobj,highscore,jumlah_roll):
                 else:
                     if wait.author.id == bot.user.id:
                         await message.send('nyerah')
-                    await message.send('**Entek roll mu**')
+                    else:
+                        await message.send('**Entek roll mu**')
                         
             elif wait.content == 'nyerah':
                 if wait.author.name == 'Renton':
@@ -212,8 +221,7 @@ async def main(message,host,teks,teksobj,highscore,jumlah_roll):
                     pass
                 break
         else:
-            check == False
-            pass
+            check = False
 
         if check == True:
             try:
@@ -223,7 +231,10 @@ async def main(message,host,teks,teksobj,highscore,jumlah_roll):
                     await message.send("**Kata sudah digunakan**")
                 else:
                     input = wait.content
-                    kata = KBBI(input, auth)
+                    try:
+                        kata = KBBI(input, auth)
+                    except:
+                        kata = KBBI(input, auth)
                     #print('Benar'+input+' - '+str(len(input)))                    
                     await teks_score_obj.delete()
                     await before.delete()
@@ -321,7 +332,7 @@ async def makeSplit(entri):
 
 def getRandomWord():
     pos = random.randint(0,(len(words)-1))
-    return words[pos]
+    return words[pos].strip()
 
 class Player:
     id = ''
